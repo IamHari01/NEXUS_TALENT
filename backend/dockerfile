@@ -1,0 +1,24 @@
+# Stage 1: Build dependencies
+FROM python:3.11-slim as builder
+
+WORKDIR /app
+COPY requirements.txt .
+# Install dependencies into a local folder to keep the final image clean
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Stage 2: Final Runtime
+FROM python:3.11-slim
+
+WORKDIR /app
+# Copy only the installed packages from the builder stage
+COPY --from=builder /install /usr/local
+COPY . .
+
+# Security: Run as non-root user
+RUN useradd -m nexususer && chown -R nexususer /app
+USER nexususer
+
+EXPOSE 8000
+
+# Optimization: Use Gunicorn with Uvicorn workers for production stability
+CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "app.main:app", "--bind", "0.0.0.0:8000"]

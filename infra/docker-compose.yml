@@ -1,0 +1,141 @@
+version: '3.9'
+
+services:
+  # --- OBSERVABILITY PILLAR (SigNoz) ---
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:0.129.12
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./infra/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC for backend tracing
+      - "4318:4318" # OTLP HTTP
+    networks:
+      - nexus-network
+
+  # --- DATA PILLAR ---
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.1
+    ports:
+      - "8081:8080"
+      - "50051:50051" # gRPC for high-speed AI queries
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none' # Handled in Python code
+      ENABLE_MODULES: ''
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - nexus-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - nexus-network
+
+  # --- APPLICATION PILLAR ---
+  api:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - weaviate
+      - signoz-otel-collector
+    environment:
+      REDIS_URL: redis://redis:6379
+      WEAVIATE_URL: http://weaviate:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-otel-collector:4317
+      OTEL_SERVICE_NAME: "nexus-talent-api"
+    networks:
+      - nexus-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    networks:
+      - nexus-network
+
+networks:
+  nexus-network:
+    driver: bridge
+
+volumes:
+  weaviate_data:version: '3.9'
+
+services:
+  # --- OBSERVABILITY PILLAR (SigNoz) ---
+  signoz-otel-collector:
+    image: signoz/signoz-otel-collector:0.129.12
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./infra/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC for backend tracing
+      - "4318:4318" # OTLP HTTP
+    networks:
+      - nexus-network
+
+  # --- DATA PILLAR ---
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.1
+    ports:
+      - "8081:8080"
+      - "50051:50051" # gRPC for high-speed AI queries
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none' # Handled in Python code
+      ENABLE_MODULES: ''
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - nexus-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - nexus-network
+
+  # --- APPLICATION PILLAR ---
+  api:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - weaviate
+      - signoz-otel-collector
+    environment:
+      REDIS_URL: redis://redis:6379
+      WEAVIATE_URL: http://weaviate:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://signoz-otel-collector:4317
+      OTEL_SERVICE_NAME: "nexus-talent-api"
+    networks:
+      - nexus-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    networks:
+      - nexus-network
+
+networks:
+  nexus-network:
+    driver: bridge
+
+volumes:
+  weaviate_data:

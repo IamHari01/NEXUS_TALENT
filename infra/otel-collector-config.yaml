@@ -1,0 +1,27 @@
+receivers:
+  otlp:
+    protocols:
+      grpc: # Backend gRPC traces
+      http: # Frontend/Browser metrics
+
+processors:
+  batch: # Optimizes performance by sending data in bundles
+  resourcedetection:
+    detectors: [env, system] # Captures metadata about your server
+
+exporters:
+  otlp/signoz:
+    endpoint: "signoz-otel-collector:4317" # Internal routing to SigNoz
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, resourcedetection]
+      exporters: [otlp/signoz]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/signoz]
